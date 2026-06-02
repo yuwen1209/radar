@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>趨勢選股雷達 · 台股版</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0e0e14;--panel:#181820;--panel2:#1f1f2b;
+  --border:rgba(255,210,230,0.08);--border2:rgba(255,210,230,0.18);
+  --text:#f0e8f0;--dim:#8878a0;--dim2:#baaac8;
+  --pink:#ff7eb3;--pink-dim:rgba(255,126,179,0.1);--pink-glow:rgba(255,126,179,0.3);
+  --lilac:#d4aaff;--lilac-dim:rgba(212,170,255,0.1);
+  --mint:#7effd4;--amber:#ffcc66;--red:#ff7070;
+  --mono:'JetBrains Mono',monospace;--sans:'Noto Sans TC',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 0%,rgba(255,126,179,0.04),transparent 55%),radial-gradient(ellipse at 80% 100%,rgba(212,170,255,0.04),transparent 55%);pointer-events:none;z-index:0}
+.wrap{max-width:1280px;margin:0 auto;padding:0 16px 60px;position:relative;z-index:1}
+
+/* NAV */
+.nav{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(14,14,20,0.96);backdrop-filter:blur(14px);z-index:100;gap:12px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:10px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--pink);box-shadow:0 0 10px var(--pink-glow);animation:pulse 2.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.logo-text{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.07em}
+.nav-r{display:flex;align-items:center;gap:10px}
+#clock{font-family:var(--mono);font-size:11px;color:var(--dim2)}
+#lastUpdate{font-family:var(--mono);font-size:10px;color:var(--dim)}
+.refresh-btn{font-family:var(--mono);font-size:11px;font-weight:700;padding:7px 16px;background:var(--pink);color:#1a0820;border:none;border-radius:4px;cursor:pointer;box-shadow:0 0 12px var(--pink-glow);transition:all .15s}
+.refresh-btn:hover{box-shadow:0 0 22px var(--pink-glow);transform:translateY(-1px)}
+.refresh-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* STATUS */
+.status-bar{display:flex;align-items:center;gap:8px;padding:8px 0;font-family:var(--mono);font-size:11px;color:var(--dim2);border-bottom:1px solid var(--border)}
+.sdot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.sd-idle{background:var(--dim)}.sd-loading{background:var(--amber);animation:pulse 1s infinite}
+.sd-ok{background:var(--mint)}.sd-err{background:var(--red)}
+
+/* HERO */
+.hero{padding:22px 0 16px;border-bottom:1px solid var(--border)}
+.eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--pink);text-transform:uppercase;margin-bottom:8px}
+h1{font-size:clamp(20px,3vw,34px);font-weight:700;line-height:1.15;letter-spacing:-.02em;margin-bottom:6px}
+h1 em{font-style:normal;color:var(--pink)}
+.hero-meta{font-family:var(--mono);font-size:11px;color:var(--dim2);display:flex;flex-wrap:wrap;gap:14px;margin-top:8px}
+
+/* SIGNAL CARDS */
+.sec-title{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase;margin:18px 0 10px;display:flex;align-items:center;gap:8px}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.signal-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin-bottom:14px}
+.sc{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:11px 13px}
+.sc.us{border-left:3px solid var(--pink)}
+.sc.jp{border-left:3px solid var(--amber)}
+.sc-h{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.sc-flag{font-size:14px}.sc-sec{font-size:13px;font-weight:700}
+.sc-badge{font-family:var(--mono);font-size:9px;font-weight:700;padding:2px 6px;border-radius:2px;margin-left:auto}
+.bh{background:rgba(255,126,179,.12);color:var(--pink);border:1px solid rgba(255,126,179,.25)}
+.bm{background:rgba(255,204,102,.12);color:var(--amber);border:1px solid rgba(255,204,102,.25)}
+.sc-ev{font-size:11px;color:var(--dim2);line-height:1.6;margin-bottom:5px}
+.sc-picks{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.pk{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:2px}
+.pk.us{background:var(--pink-dim);color:var(--pink);border:1px solid rgba(255,126,179,.2)}
+.pk.jp{background:rgba(255,204,102,.08);color:var(--amber);border:1px solid rgba(255,204,102,.2)}
+
+/* FILTER BAR */
+.filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.fb{font-family:var(--mono);font-size:11px;padding:4px 12px;border:1px solid var(--border2);border-radius:3px;background:transparent;color:var(--dim2);cursor:pointer;transition:all .15s}
+.fb.on{background:var(--pink-dim);color:var(--pink);border-color:rgba(255,126,179,.35)}
+.sort-hint{font-family:var(--mono);font-size:10px;color:var(--dim);margin-left:auto}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;min-width:900px}
+thead th{background:var(--panel2);padding:9px 12px;text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--dim);text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
+thead th:hover{color:var(--text)}
+thead th.asc::after{content:' ↑';color:var(--pink)}
+thead th.desc::after{content:' ↓';color:var(--pink)}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:rgba(255,126,179,0.03)}
+td{padding:10px 12px;vertical-align:middle}
+
+/* group header */
+.gh td{background:rgba(255,126,179,0.04);padding:6px 12px;font-family:var(--mono);font-size:10px;letter-spacing:.15em;color:var(--pink);border-bottom:1px solid var(--border);border-top:1px solid var(--border)}
+
+/* cells */
+.ct{font-family:var(--mono);font-size:15px;font-weight:700}
+.cc{font-family:var(--mono);font-size:11px;color:var(--dim2)}
+.cs{font-family:var(--mono);font-size:9px;font-weight:600;padding:2px 6px;border-radius:2px;display:inline-block;margin-top:3px}
+.s-semi{background:rgba(91,156,246,.12);color:#5b9cf6;border:1px solid rgba(91,156,246,.2)}
+.s-srv{background:rgba(255,126,179,.1);color:var(--pink);border:1px solid rgba(255,126,179,.2)}
+.s-cool{background:rgba(126,255,212,.08);color:var(--mint);border:1px solid rgba(126,255,212,.18)}
+.s-mem{background:rgba(212,170,255,.1);color:var(--lilac);border:1px solid rgba(212,170,255,.2)}
+.s-pwr{background:rgba(255,204,102,.1);color:var(--amber);border:1px solid rgba(255,204,102,.2)}
+.s-opt{background:rgba(255,126,179,.12);color:#ffaacc;border:1px solid rgba(255,170,204,.2)}
+.s-rob{background:rgba(126,255,212,.08);color:#aaf0d1;border:1px solid rgba(170,240,209,.18)}
+.s-elc{background:rgba(255,204,102,.08);color:#ffd88a;border:1px solid rgba(255,204,102,.15)}
+.s-net{background:rgba(91,156,246,.08);color:#7ab3f5;border:1px solid rgba(91,156,246,.15)}
+.s-test{background:rgba(212,170,255,.08);color:#c8a8ff;border:1px solid rgba(212,170,255,.15)}
+.s-equip{background:rgba(126,255,212,.06);color:#88ddbb;border:1px solid rgba(126,255,212,.15)}
+
+/* 推薦標籤 */
+.rtag{font-family:var(--mono);font-size:9px;font-weight:700;padding:2px 7px;border-radius:2px;display:inline-block;white-space:nowrap}
+.r-sig{background:rgba(255,126,179,.08);color:#ff9ed2;border:1px solid rgba(255,126,179,.2)}
+.r-main{background:rgba(126,255,212,.08);color:var(--mint);border:1px solid rgba(126,255,212,.2)}
+.r-hidden{background:var(--lilac-dim);color:var(--lilac);border:1px solid rgba(212,170,255,.2)}
+
+/* 股價 */
+.p-up{color:var(--pink)}.p-dn{color:var(--mint)}.p-flat{color:var(--dim2)}
+.p-spin{font-family:var(--mono);font-size:11px;color:var(--dim);animation:blink .8s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* PE */
+.pe-val{font-family:var(--mono);font-size:13px;font-weight:700}
+.pe-g{color:var(--mint)}.pe-a{color:var(--amber)}.pe-r{color:var(--red)}
+
+/* 上漲空間柱狀條 */
+.bar-wrap{display:flex;align-items:center;gap:8px;min-width:120px}
+.bar-bg{flex:1;height:6px;background:rgba(255,210,230,0.1);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--mint),rgba(126,255,212,0.5));transition:width .6s ease}
+.bar-pct{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--mint);min-width:36px;text-align:right}
+
+/* 護城河/推薦原因 */
+.moat{font-size:11px;color:var(--dim2);line-height:1.5;max-width:260px;white-space:normal}
+.reason{font-family:var(--mono);font-size:9px;color:var(--amber);margin-top:3px}
+
+.disc{margin-top:20px;padding:10px 14px;background:var(--panel);border:1px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:10px;color:var(--dim2);line-height:1.75}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="nav">
+  <div class="logo"><div class="dot"></div><span class="logo-text">TREND_RADAR ✦ 台股版</span></div>
+  <div class="nav-r">
+    <span id="clock"></span>
+    <span id="lastUpdate">尚未更新</span>
+    <button class="refresh-btn" id="refreshBtn" onclick="loadPrices()">↻ 更新報價</button>
+  </div>
+</nav>
+
+<div class="status-bar">
+  <div class="sdot sd-idle" id="sdot"></div>
+  <span id="statusText">點擊「↻ 更新報價」從 Google Sheet 載入股價</span>
+</div>
+
+<div class="hero">
+  <div class="eyebrow">// 美股 + 日股訊號 → 台股操盤</div>
+  <h1>今日操盤<em>一覽表</em></h1>
+  <div class="hero-meta">
+    <span id="signal-date">📅 2026/06/01 美股收盤 · 6/02 日股開盤中</span>
+    <span>🇯🇵 日經 ~66000 圓 開盤中</span>
+    <span>🇹🇼 台股 2026/06/02 週一</span>
+  </div>
+</div>
+
+<!-- 今日訊號 -->
+<div class="sec-title">今日市場訊號 <span style="font-family:var(--mono);font-size:9px;color:var(--dim);font-weight:400">🇺🇸 美股 6/1 收盤 · 🇯🇵 日股 6/2 開盤中</span></div>
+<div class="signal-grid" id="signal-grid">
+  <div class="sc us">
+    <div class="sc-h"><span class="sc-flag">🇺🇸</span><span class="sc-sec">AI PC · NVIDIA RTX Spark</span><span class="sc-badge bh">▲▲ 強烈</span></div>
+    <div class="sc-ev">NVIDIA <b>+6.3%</b> 收盤，Computex 發表 RTX Spark AI PC 晶片，與聯發科合作、台積電 3nm 製造。Oracle +9.9%、Dell +9%、Microsoft +2.3%。S&P500 +0.3%、Nasdaq +0.4% 雙創歷史新高。</div>
+    <div class="sc-picks"><span class="pk us">廣達 2382</span><span class="pk us">緯創 3231</span><span class="pk us">聯發科 2454</span><span class="pk us">技嘉 2376</span></div>
+  </div>
+  <div class="sc us">
+    <div class="sc-h"><span class="sc-flag">🇺🇸</span><span class="sc-sec">企業軟體 / 雲端</span><span class="sc-badge bh">▲▲ 強烈</span></div>
+    <div class="sc-ev">Salesforce <b>+9.6%</b>、IBM <b>+7.3%</b>，軟體 AI 化重新定價，S&P500 科技族群領漲，軟體服務指數收復全年跌幅。</div>
+    <div class="sc-picks"><span class="pk us">智邦 2345</span><span class="pk us">緯穎 6669</span></div>
+  </div>
+  <div class="sc us">
+    <div class="sc-h"><span class="sc-flag">🇺🇸</span><span class="sc-sec">記憶體 / HBM</span><span class="sc-badge bh">▲▲ 強烈</span></div>
+    <div class="sc-ev">Micron <b>+5.7%</b> 突破 $1,000 歷史新高，HBM 需求持續爆發，AI 記憶體供不應求，法人上調目標價。</div>
+    <div class="sc-picks"><span class="pk us">南亞科 2408</span><span class="pk us">華邦電 2344</span></div>
+  </div>
+  <div class="sc us" style="border-left-color:var(--red);background:rgba(255,112,112,0.03)">
+    <div class="sc-h"><span class="sc-flag">⚠️</span><span class="sc-sec">弱勢 / 注意迴避</span><span class="sc-badge bm">▼ 留意</span></div>
+    <div class="sc-ev">Amazon <b>-3.5%</b>、Merck <b>-3%</b>；能源股因美伊衝突升溫短暫大漲後回落。週二起 JOLTS 職缺、週五 NFP 就業數據，Fed 政策焦點。</div>
+    <div class="sc-picks"><span class="pk us" style="background:rgba(255,112,112,0.1);color:var(--red);border-color:rgba(255,112,112,0.2)">觀望零售股</span></div>
+  </div>
+  <div class="sc jp">
+    <div class="sc-h"><span class="sc-flag">🇯🇵</span><span class="sc-sec">AI 半導體 / 電機</span><span class="sc-badge bh">▲▲ 強烈</span></div>
+    <div class="sc-ev">日股今日開盤，野村推薦「電機＋機械」為 2026 核心族群。AI 半導體（Advantest、東電）、防衛、機器人持續領漲，日經目標 68,000 圓上方。</div>
+    <div class="sc-picks"><span class="pk jp">京元電 2449</span><span class="pk jp">辛耘 3583</span><span class="pk jp">奇鋐 3017</span></div>
+  </div>
+  <div class="sc jp">
+    <div class="sc-h"><span class="sc-flag">🇯🇵</span><span class="sc-sec">機器人 / 工業自動化</span><span class="sc-badge bm">▲ 中等</span></div>
+    <div class="sc-ev">Fanuc、安川電機持續強勢，野村 2026 年機械族群核心推薦。台股比日股晚開 1-2 小時，日股強勢是台股領先指標。</div>
+    <div class="sc-picks"><span class="pk jp">上銀 2049</span><span class="pk jp">直得 1597</span></div>
+  </div>
+</div>
+
+<!-- 選股總表 -->
+<div class="sec-title">選股總表 <span style="font-family:var(--mono);font-size:9px;color:var(--dim);font-weight:400;letter-spacing:.05em">按族群分組 · 同族群內 P/E 低→高</span></div>
+<div class="filter-bar">
+  <span style="font-family:var(--mono);font-size:11px;color:var(--dim2)">篩選：</span>
+  <button class="fb on" onclick="setFilter('all',this)">全部</button>
+  <button class="fb" onclick="setFilter('AI伺服器',this)">AI 伺服器</button>
+  <button class="fb" onclick="setFilter('半導體',this)">半導體</button>
+  <button class="fb" onclick="setFilter('光通訊',this)">光通訊</button>
+  <button class="fb" onclick="setFilter('電源',this)">電源</button>
+  <button class="fb" onclick="setFilter('其他',this)">其他</button>
+  <span class="sort-hint">同族群內依 P/E 低→高排列</span>
+</div>
+<div class="tbl-wrap">
+  <table>
+    <thead><tr>
+      <th>股票</th>
+      <th onclick="sortBy('price')">現價 / 漲跌</th>
+      <th onclick="sortBy('pe')">P/E ↑</th>
+      <th>上漲空間</th>
+      <th>推薦原因</th>
+      <th>護城河重點</th>
+    </tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<div class="disc">⚠ 股價來源：Google Sheet + MIS 即時 API。目標價來自法人公開研報，不構成投資建議。投資有風險，自負盈虧。</div>
+</div>
+
+<script>
+const SHEET_API = 'https://script.google.com/macros/s/AKfycbxDiYs1RfZpUYHrJxD8gKlCJITshage_N3dI6afBkH5wGForiN8lEeSW0LGPaAG-DBn/exec';
+
+(function tick(){
+  const n=new Date();
+  document.getElementById('clock').textContent=[n.getHours(),n.getMinutes(),n.getSeconds()].map(x=>String(x).padStart(2,'0')).join(':');
+  setTimeout(tick,1000);
+})();
+
+function setStatus(t,m){
+  document.getElementById('sdot').className='sdot '+({loading:'sd-loading',ok:'sd-ok',err:'sd-err'}[t]||'sd-idle');
+  document.getElementById('statusText').textContent=m;
+}
+
+/* ── 股票資料（按族群分組） ── */
+const GROUPS = [
+  {
+    id:'AI伺服器', name:'🖥 AI 伺服器 / ODM',
+    stocks:[
+      {t:'英業達',c:'2356',n:'Inventec',sc:'s-srv',sec:'AI 伺服器',pe:12,tpAvg:75,up:25,
+       rtag:'r-sig',reason:'🇺🇸 Dell+9% 直接受惠',
+       moat:'Dell AI 伺服器組裝首選，P/E 12x 族群最低，外資法說後加碼。'},
+      {t:'緯創',c:'3231',n:'Wistron',sc:'s-srv',sec:'AI 伺服器',pe:13,tpAvg:190,up:29,
+       rtag:'r-main',reason:'主流推薦 · 低基期',
+       moat:'液冷整機垂直整合，Q1 合併營收年增 144%，Dell 爆發直接受惠。'},
+      {t:'廣達',c:'2382',n:'Quanta',sc:'s-srv',sec:'AI 伺服器',pe:14,tpAvg:407,up:27,
+       rtag:'r-main',reason:'主流推薦 · NVIDIA ODM',
+       moat:'Vera Rubin 最大 ODM，P/E 14x 遠低合理值 20x，外資目標均超 400 元。'},
+      {t:'緯穎',c:'6669',n:'Wiwynn',sc:'s-srv',sec:'AI 伺服器',pe:22,tpAvg:6500,up:20,
+       rtag:'r-sig',reason:'🇺🇸 SNOW+36% · AI 算力擴建',
+       moat:'NVIDIA GB 系列純度最高 ODM，AI 訂單佔比超 70%。'},
+    ]
+  },
+  {
+    id:'半導體', name:'💾 半導體 / 記憶體 / 測試',
+    stocks:[
+      {t:'南亞科',c:'2408',n:'Nanya Tech',sc:'s-mem',sec:'AI 記憶體',pe:12,tpAvg:242,up:44,
+       rtag:'r-main',reason:'主流推薦 · HBM 外溢',
+       moat:'台灣唯一獨立 DRAM 廠，HBM 缺貨外溢 DDR5，毛利率 67.9% 歷史新高。'},
+      {t:'辛耘',c:'3583',n:'Scientech',sc:'s-equip',sec:'半導體設備',pe:20,tpAvg:420,up:28,
+       rtag:'r-sig',reason:'🇯🇵 Screen HD 大漲對應',
+       moat:'台灣半導體清洗設備龍頭，AI 製程升級帶動設備採購週期。'},
+      {t:'京元電',c:'2449',n:'KYEC',sc:'s-test',sec:'晶片測試',pe:25,tpAvg:280,up:22,
+       rtag:'r-sig',reason:'🇺🇸🇯🇵 雙訊號 · Advantest 對應',
+       moat:'AI 晶片測試龍頭，Rubin GPU 測試訂單滿載，AI 訂單佔 35-40%。'},
+    ]
+  },
+  {
+    id:'光通訊', name:'🔆 光通訊 / CPO / 矽光子',
+    stocks:[
+      {t:'群電',c:'6412',n:'Compuware',sc:'s-pwr',sec:'48V 電源',pe:11,tpAvg:130,up:65,
+       rtag:'r-hidden',reason:'🔍 黑馬 · 台達電輪動首選',
+       moat:'P/E 11x 全族群最低，48V 電源送樣高階款，台達電大漲後資金最可能輪動至此。'},
+      {t:'聯鈞',c:'3450',n:'LINKCOM',sc:'s-opt',sec:'光通訊 AOC',pe:16,tpAvg:450,up:55,
+       rtag:'r-hidden',reason:'🔍 黑馬 · 雷射封測龍頭',
+       moat:'源傑雷射二極體封測 15 年，400G→800G→1.6T 全線佈局，產能三年擴三倍。'},
+      {t:'波若威',c:'3163',n:'Browave',sc:'s-opt',sec:'矽光子 CPO',pe:18,tpAvg:560,up:58,
+       rtag:'r-hidden',reason:'🔍 黑馬 · 1.6T 升級受惠',
+       moat:'CPO 高芯數光纖連接器，1.6T 升級結構性需求，PEG 值族群最具競爭力。'},
+      {t:'上詮',c:'3441',n:'Hitron',sc:'s-opt',sec:'矽光子 CPO',pe:19,tpAvg:350,up:73,
+       rtag:'r-hidden',reason:'🔍 黑馬 · CPO 最早期佈局',
+       moat:'CPO 光纖精準耦合 FAU 龍頭，台積電 COUPE 唯一認證夥伴，2026 下半年量產。'},
+    ]
+  },
+  {
+    id:'電源', name:'⚡ 電源 / 散熱 / AI 電力',
+    stocks:[
+      {t:'華城',c:'1519',n:'Hua Cheng',sc:'s-elc',sec:'電力基礎設施',pe:14,tpAvg:875,up:32,
+       rtag:'r-hidden',reason:'🔍 黑馬 · AI 電力基建',
+       moat:'台灣超高壓變壓器市佔第一，AI 資料中心電力需求爆增，最少人注意的長線贏家。'},
+      {t:'奇鋐',c:'3017',n:'Auras',sc:'s-cool',sec:'液冷散熱',pe:18,tpAvg:2200,up:50,
+       rtag:'r-main',reason:'主流推薦 · 液冷龍頭',
+       moat:'水冷板 CDU 龍頭，Vera Rubin 全面液冷強制升級，Q1 EPS 年增 1.46 倍新高。'},
+    ]
+  },
+];
+
+const priceData = {};
+
+function peColor(pe){ return pe<15?'pe-g':pe<25?'pe-a':'pe-r'; }
+
+function priceHtml(code){
+  const pd=priceData[code];
+  if(!pd) return '<span class="p-spin">--</span>';
+  const cls=pd.chg>0?'p-up':pd.chg<0?'p-dn':'p-flat';
+  const sign=pd.chg>0?'+':'';
+  return `<div class="pe-val ${cls}" style="font-size:15px">${pd.price.toFixed(1)}</div>
+    <div style="font-family:var(--mono);font-size:11px" class="${cls}">${sign}${pd.chg.toFixed(2)} (${sign}${pd.chgPct.toFixed(2)}%)</div>`;
+}
+
+let curFilter='all', sortKey=null, sortDir=1;
+
+function render(){
+  const tbody=document.getElementById('tbody');
+  let html='';
+
+  GROUPS.forEach(grp=>{
+    // 篩選
+    if(curFilter!=='all' && grp.id!==curFilter) return;
+
+    // 族群 header
+    html+=`<tr class="gh"><td colspan="6">${grp.name}</td></tr>`;
+
+    // 同族群內依 PE 排序（預設），或依 sortKey
+    let stocks=[...grp.stocks];
+    if(sortKey==='pe') stocks.sort((a,b)=>sortDir*(a.pe-b.pe));
+    else if(sortKey==='price'){
+      stocks.sort((a,b)=>{
+        const pa=priceData[a.c]?.price||0, pb=priceData[b.c]?.price||0;
+        return sortDir*(pb-pa);
+      });
+    } else {
+      stocks.sort((a,b)=>a.pe-b.pe); // 預設 PE 低→高
+    }
+
+    stocks.forEach(s=>{
+      const barW=Math.round(s.up/80*100); // 80% = 最大寬度基準
+      html+=`<tr>
+        <td>
+          <div class="ct">${s.t}</div>
+          <div class="cc">${s.c}</div>
+          <span class="cs ${s.sc}">${s.sec}</span>
+        </td>
+        <td>${priceHtml(s.c)}</td>
+        <td><span class="pe-val ${peColor(s.pe)}">${s.pe}x</span></td>
+        <td>
+          <div class="bar-wrap">
+            <div class="bar-bg"><div class="bar-fill" style="width:${barW}%"></div></div>
+            <span class="bar-pct">+${s.up}%</span>
+          </div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--dim2);margin-top:2px">均值 $${s.tpAvg.toLocaleString()}</div>
+        </td>
+        <td>
+          <span class="rtag ${s.rtag}">${s.reason}</span>
+        </td>
+        <td class="moat">${s.moat}</td>
+      </tr>`;
+    });
+  });
+
+  tbody.innerHTML=html;
+
+  // 更新 priceData 顯示
+  document.querySelectorAll('thead th').forEach(th=>{
+    th.classList.remove('asc','desc');
+    const fn=th.getAttribute('onclick');
+    if(!fn) return;
+    const k=fn.match(/sortBy\('(\w+)'\)/)?.[1];
+    if(k===sortKey) th.classList.add(sortDir===1?'asc':'desc');
+  });
+}
+
+function setFilter(f,btn){
+  curFilter=f;
+  document.querySelectorAll('.fb').forEach(b=>b.classList.toggle('on',b===btn));
+  render();
+}
+
+function sortBy(key){
+  if(sortKey===key) sortDir*=-1; else{sortKey=key;sortDir=1;}
+  render();
+}
+
+/* ── 從 Google Sheet 載入 ── */
+async function loadPrices(){
+  const btn=document.getElementById('refreshBtn');
+  btn.disabled=true; btn.textContent='↻ 更新中...';
+  setStatus('loading','正在從 Google Sheet 取得股價...');
+
+  function fetchJSONP(url){
+    return new Promise((resolve,reject)=>{
+      const cb='gs_cb_'+Date.now();
+      const script=document.createElement('script');
+      const timer=setTimeout(()=>{cleanup();reject(new Error('逾時'));},20000);
+      function cleanup(){delete window[cb];if(script.parentNode)script.parentNode.removeChild(script);clearTimeout(timer);}
+      window[cb]=(data)=>{cleanup();resolve(data);};
+      script.onerror=()=>{cleanup();reject(new Error('Script 載入失敗'));};
+      script.src=url+(url.includes('?')?'&':'?')+'callback='+cb;
+      document.head.appendChild(script);
+    });
+  }
+
+  try{
+    let d;
+    try{ d=await fetchJSONP(SHEET_API); }
+    catch(e){ const r=await fetch(SHEET_API,{signal:AbortSignal.timeout(15000)}); d=await r.json(); }
+
+    const rows=d.prices||d.data||[];
+    let ok=0;
+    rows.forEach(row=>{
+      const code=String(row.code||'').trim();
+      if(!code) return;
+      const price=parseFloat(row.price)||0;
+      const prev=parseFloat(row.prev)||0;
+      const chg=prev?price-prev:0;
+      const chgPct=prev?chg/prev*100:0;
+      if(price>0){priceData[code]={price,prev,chg,chgPct};ok++;}
+    });
+
+    if(Array.isArray(d.signals)&&d.signals.length>0) renderSignals(d.signals);
+
+    const n=new Date();
+    document.getElementById('lastUpdate').textContent=
+      `更新：${n.toLocaleDateString('zh-TW',{month:'2-digit',day:'2-digit'})} ${n.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}`;
+    setStatus('ok',`${ok} 支股票報價更新完成 ✓`);
+    render();
+  }catch(e){
+    setStatus('err',`連線失敗：${e.message}`);
+  }
+  btn.disabled=false; btn.textContent='↻ 更新報價';
+}
+
+function renderSignals(signals){
+  const grid=document.getElementById('signal-grid');
+  if(!grid||!signals.length) return;
+  grid.innerHTML=signals.map(s=>{
+    const isJp=s.type==='jp', isWeak=s.type==='weak';
+    const cardCls=isWeak?'sc':isJp?'sc jp':'sc us';
+    const badgeCls=isWeak?'sc-badge bm':s.signal==='hot'?'sc-badge bh':'sc-badge bm';
+    const badgeText=isWeak?'▼ 弱勢':s.signal==='hot'?'▲▲ 強烈':'▲ 中等';
+    const flag=isJp?'🇯🇵':isWeak?'⚠️':'🇺🇸';
+    const pkCls=isJp?'pk jp':'pk us';
+    return `<div class="${cardCls}">
+      <div class="sc-h"><span class="sc-flag">${flag}</span><span class="sc-sec">${s.sector}</span><span class="${badgeCls}">${badgeText}</span></div>
+      <div class="sc-ev">${s.event}</div>
+      ${(s.picks||[]).length?`<div class="sc-picks">${s.picks.map(p=>`<span class="${pkCls}">${p}</span>`).join('')}</div>`:''}
+    </div>`;
+  }).join('');
+  if(signals[0]?.date) document.getElementById('signal-date').textContent=`📅 ${signals[0].date} 訊號`;
+}
+
+render();
+</script>
+</body>
+</html>
