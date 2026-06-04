@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>趨勢選股雷達 · 台股版</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0e0e14;--panel:#181820;--panel2:#1f1f2b;
+  --border:rgba(255,210,230,0.08);--border2:rgba(255,210,230,0.18);
+  --text:#f0e8f0;--dim:#8878a0;--dim2:#baaac8;
+  --pink:#ff7eb3;--pink-dim:rgba(255,126,179,0.1);--pink-glow:rgba(255,126,179,0.3);
+  --lilac:#d4aaff;--lilac-dim:rgba(212,170,255,0.1);
+  --mint:#7effd4;--amber:#ffcc66;--red:#ff7070;
+  --mono:'JetBrains Mono',monospace;--sans:'Noto Sans TC',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 0%,rgba(255,126,179,0.04),transparent 55%),radial-gradient(ellipse at 80% 100%,rgba(212,170,255,0.04),transparent 55%);pointer-events:none;z-index:0}
+.wrap{max-width:1280px;margin:0 auto;padding:0 16px 60px;position:relative;z-index:1}
+
+/* NAV */
+.nav{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(14,14,20,0.96);backdrop-filter:blur(14px);z-index:100;gap:12px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:10px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--pink);box-shadow:0 0 10px var(--pink-glow);animation:pulse 2.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.logo-text{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.07em}
+.nav-r{display:flex;align-items:center;gap:10px}
+#clock{font-family:var(--mono);font-size:11px;color:var(--dim2)}
+#lastUpdate{font-family:var(--mono);font-size:10px;color:var(--dim)}
+.refresh-btn{font-family:var(--mono);font-size:11px;font-weight:700;padding:7px 16px;background:var(--pink);color:#1a0820;border:none;border-radius:4px;cursor:pointer;box-shadow:0 0 12px var(--pink-glow);transition:all .15s}
+.refresh-btn:hover{box-shadow:0 0 22px var(--pink-glow);transform:translateY(-1px)}
+.refresh-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* STATUS */
+.status-bar{display:flex;align-items:center;gap:8px;padding:8px 0;font-family:var(--mono);font-size:11px;color:var(--dim2);border-bottom:1px solid var(--border)}
+.sdot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.sd-idle{background:var(--dim)}.sd-loading{background:var(--amber);animation:pulse 1s infinite}
+.sd-ok{background:var(--mint)}.sd-err{background:var(--red)}
+
+/* HERO */
+.hero{padding:22px 0 16px;border-bottom:1px solid var(--border)}
+.eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--pink);text-transform:uppercase;margin-bottom:8px}
+h1{font-size:clamp(20px,3vw,34px);font-weight:700;line-height:1.15;letter-spacing:-.02em;margin-bottom:6px}
+h1 em{font-style:normal;color:var(--pink)}
+.hero-meta{font-family:var(--mono);font-size:11px;color:var(--dim2);display:flex;flex-wrap:wrap;gap:14px;margin-top:8px}
+
+/* SIGNAL CARDS */
+.sec-title{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase;margin:18px 0 10px;display:flex;align-items:center;gap:8px}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.signal-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin-bottom:14px}
+.sc{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:11px 13px}
+.sc.us{border-left:3px solid var(--pink)}
+.sc.jp{border-left:3px solid var(--amber)}
+.sc-h{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.sc-flag{font-size:14px}.sc-sec{font-size:13px;font-weight:700}
+.sc-badge{font-family:var(--mono);font-size:9px;font-weight:700;padding:2px 6px;border-radius:2px;margin-left:auto}
+.bh{background:rgba(255,126,179,.12);color:var(--pink);border:1px solid rgba(255,126,179,.25)}
+.bm{background:rgba(255,204,102,.12);color:var(--amber);border:1px solid rgba(255,204,102,.25)}
+.sc-ev{font-size:11px;color:var(--dim2);line-height:1.6;margin-bottom:5px}
+.sc-picks{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.pk{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:2px}
+.pk.us{background:var(--pink-dim);color:var(--pink);border:1px solid rgba(255,126,179,.2)}
+.pk.jp{background:rgba(255,204,102,.08);color:var(--amber);border:1px solid rgba(255,204,102,.2)}
+
+/* FILTER BAR */
+.filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.fb{font-family:var(--mono);font-size:11px;padding:4px 12px;border:1px solid var(--border2);border-radius:3px;background:transparent;color:var(--dim2);cursor:pointer;transition:all .15s}
+.fb.on{background:var(--pink-dim);color:var(--pink);border-color:rgba(255,126,179,.35)}
+.sort-hint{font-family:var(--mono);font-size:10px;color:var(--dim);margin-left:auto}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;min-width:900px}
+thead th{background:var(--panel2);padding:9px 12px;text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--dim);text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
+thead th:hover{color:var(--text)}
+thead th.asc::after{content:' ↑';color:var(--pink)}
+thead th.desc::after{content:' ↓';color:var(--pink)}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:rgba(255,126,179,0.03)}
+td{padding:10px 12px;vertical-align:middle}
+
+/* group header */
+.gh td{background:rgba(255,126,179,0.04);padding:6px 12px;font-family:var(--mono);font-size:10px;letter-spacing:.15em;color:var(--pink);border-bottom:1px solid var(--border);border-top:1px solid var(--border)}
+
+/* cells */
+.ct{font-family:var(--mono);font-size:15px;font-weight:700}
+.cc{font-family:var(--mono);font-size:11px;color:var(--dim2)}
+.cs{font-family:var(--mono);font-size:9px;font-weight:600;padding:2px 6px;border-radius:2px;display:inline-block;margin-top:3px}
+.s-semi{background:rgba(91,156,246,.12);color:#5b9cf6;border:1px solid rgba(91,156,246,.2)}
+.s-srv{background:rgba(255,126,179,.1);color:var(--pink);border:1px solid rgba(255,126,179,.2)}
+.s-cool{background:rgba(126,255,212,.08);color:var(--mint);border:1px solid rgba(126,255,212,.18)}
+.s-mem{background:rgba(212,170,255,.1);color:var(--lilac);border:1px solid rgba(212,170,255,.2)}
+.s-pwr{background:rgba(255,204,102,.1);color:var(--amber);border:1px solid rgba(255,204,102,.2)}
+.s-opt{background:rgba(255,126,179,.12);color:#ffaacc;border:1px solid rgba(255,170,204,.2)}
+.s-rob{background:rgba(126,255,212,.08);color:#aaf0d1;border:1px solid rgba(170,240,209,.18)}
+.s-elc{background:rgba(255,204,102,.08);color:#ffd88a;border:1px solid rgba(255,204,102,.15)}
+.s-net{background:rgba(91,156,246,.08);color:#7ab3f5;border:1px solid rgba(91,156,246,.15)}
+.s-test{background:rgba(212,170,255,.08);color:#c8a8ff;border:1px solid rgba(212,170,255,.15)}
+.s-equip{background:rgba(126,255,212,.06);color:#88ddbb;border:1px solid rgba(126,255,212,.15)}
+
+/* 推薦標籤 */
+.rtag{font-family:var(--mono);font-size:9px;font-weight:700;padding:2px 7px;border-radius:2px;display:inline-block;white-space:nowrap}
+.r-sig{background:rgba(255,126,179,.08);color:#ff9ed2;border:1px solid rgba(255,126,179,.2)}
+.r-main{background:rgba(126,255,212,.08);color:var(--mint);border:1px solid rgba(126,255,212,.2)}
+.r-hidden{background:var(--lilac-dim);color:var(--lilac);border:1px solid rgba(212,170,255,.2)}
+
+/* 股價 */
+.p-up{color:var(--pink)}.p-dn{color:var(--mint)}.p-flat{color:var(--dim2)}
+.p-spin{font-family:var(--mono);font-size:11px;color:var(--dim);animation:blink .8s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* PE */
+.pe-val{font-family:var(--mono);font-size:13px;font-weight:700}
+.pe-g{color:var(--mint)}.pe-a{color:var(--amber)}.pe-r{color:var(--red)}
+
+/* 上漲空間柱狀條 */
+.bar-wrap{display:flex;align-items:center;gap:8px;min-width:120px}
+.bar-bg{flex:1;height:6px;background:rgba(255,210,230,0.1);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--mint),rgba(126,255,212,0.5));transition:width .6s ease}
+.bar-pct{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--mint);min-width:36px;text-align:right}
+
+/* 護城河/推薦原因 */
+.moat{font-size:11px;color:var(--dim2);line-height:1.5;max-width:260px;white-space:normal}
+.reason{font-family:var(--mono);font-size:9px;color:var(--amber);margin-top:3px}
+
+.disc{margin-top:20px;padding:10px 14px;background:var(--panel);border:1px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:10px;color:var(--dim2);line-height:1.75}
+/* TABS */
+.tabs{display:flex;border-bottom:1px solid var(--border);margin:16px 0 0;overflow-x:auto}
+.tab-btn{font-family:var(--mono);font-size:12px;padding:9px 18px;cursor:pointer;color:var(--dim);border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s;user-select:none;background:none;border-top:none;border-left:none;border-right:none}
+.tab-btn.on{color:var(--pink);border-bottom-color:var(--pink)}
+.tab-btn:hover:not(.on){color:var(--text)}
+.tab-pane{display:none}.tab-pane.on{display:block}
+/* 美股即時價格 */
+.us-price{font-family:var(--mono);font-size:14px;font-weight:700}
+.us-chg{font-family:var(--mono);font-size:11px;margin-top:1px}
+.us-pre{font-family:var(--mono);font-size:10px;color:var(--amber);margin-top:1px}
+/* 趨勢標籤 */
+.trend-tag{font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:2px;display:inline-block;margin-top:2px}
+.tr-github{background:rgba(126,255,212,0.08);color:var(--mint);border:1px solid rgba(126,255,212,0.2)}
+.tr-hn{background:rgba(255,126,179,0.08);color:var(--pink);border:1px solid rgba(255,126,179,0.2)}
+.tr-ai{background:rgba(212,170,255,0.1);color:var(--lilac);border:1px solid rgba(212,170,255,0.2)}
+.tr-energy{background:rgba(255,204,102,0.1);color:var(--amber);border:1px solid rgba(255,204,102,0.2)}
+.tr-cyber{background:rgba(91,156,246,0.1);color:#7ab3f5;border:1px solid rgba(91,156,246,0.2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="nav">
+  <div class="logo"><div class="dot"></div><span class="logo-text">TREND_RADAR ✦ 台股版</span></div>
+  <div class="nav-r">
+    <span id="clock"></span>
+    <span id="lastUpdate">尚未更新</span>
+    <button class="refresh-btn" id="refreshBtn" onclick="loadPrices()">↻ 更新報價</button>
+  </div>
+</nav>
+
+<div class="status-bar">
+  <div class="sdot sd-idle" id="sdot"></div>
+  <span id="statusText">點擊「↻ 更新報價」從 Google Sheet 載入股價</span>
+</div>
+
+<div class="hero">
+  <div class="eyebrow">// 美股 + 日股訊號 → 台股操盤</div>
+  <h1>今日操盤<em>一覽表</em></h1>
+  <div class="hero-meta">
+    <span id="signal-date">📅 2026/06/03 美股收盤 · 6/04 日台股收盤</span>
+    <span>🇯🇵 日經 67,470 圓 -931（6/4 收盤）</span>
+    <span>🇹🇼 台股 45,677 點 -781（6/4 收盤）</span>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab-btn on" data-tab="summary" onclick="switchTab('summary')">📋 今日總覽</button>
+  <button class="tab-btn" data-tab="tw" onclick="switchTab('tw')">🇹🇼 台股操盤</button>
+  <button class="tab-btn" data-tab="us" onclick="switchTab('us')">🇺🇸 美股分析</button>
+</div>
+
+<div id="tab-summary" class="tab-pane on">
+<div style="display:grid;gap:12px;margin-top:16px">
+
+  <!-- 指標燈號列 -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px">
+    <div style="background:var(--panel);border:1px solid rgba(255,112,112,0.3);border-radius:8px;padding:10px 12px;text-align:center">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--dim)">🇺🇸 道瓊 6/3</div>
+      <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--red)">-620</div>
+    </div>
+    <div style="background:var(--panel);border:1px solid rgba(255,112,112,0.25);border-radius:8px;padding:10px 12px;text-align:center">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--dim)">🇺🇸 費半 6/3</div>
+      <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--mint)">+1.39%</div>
+    </div>
+    <div style="background:var(--panel);border:1px solid rgba(255,112,112,0.25);border-radius:8px;padding:10px 12px;text-align:center">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--dim)">🇯🇵 日經 6/4</div>
+      <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--red)">-931</div>
+    </div>
+    <div style="background:var(--panel);border:1px solid rgba(255,112,112,0.3);border-radius:8px;padding:10px 12px;text-align:center">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--dim)">🇹🇼 台股 6/4</div>
+      <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--red)">-781</div>
+    </div>
+    <div style="background:var(--panel);border:1px solid rgba(255,112,112,0.2);border-radius:8px;padding:10px 12px;text-align:center">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--dim)">⚠️ AVGO</div>
+      <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--red)">-13%</div>
+    </div>
+    <div style="background:var(--panel);border:1px solid rgba(255,204,102,0.25);border-radius:8px;padding:10px 12px;text-align:center">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--dim)">🛢 WTI</div>
+      <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--amber)">$95.5</div>
+    </div>
+    <div style="background:var(--panel);border:1px solid rgba(255,204,102,0.2);border-radius:8px;padding:10px 12px;text-align:center">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--dim)">😱 VIX</div>
+      <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--amber)">15.94</div>
+    </div>
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--dim)">💱 USD/TWD</div>
+      <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--dim2)">31.42</div>
+    </div>
+  </div>
+
+  <!-- 多空研判 + 今日盤面 + 操盤邏輯 + 行事曆 四欄 -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px">
+
+    <!-- 台指期研判 -->
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px 16px">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--pink);font-weight:700;letter-spacing:.08em;margin-bottom:10px">📊 台指期研判（明日 6/5）</div>
+      <div style="display:grid;gap:6px;font-size:12px">
+        <div style="display:flex;gap:8px"><span>🔴</span><span style="color:var(--dim2)">AVGO -13% · AI 供應鏈承壓</span></div>
+        <div style="display:flex;gap:8px"><span>🔴</span><span style="color:var(--dim2)">道瓊 -620 · 美股大跌</span></div>
+        <div style="display:flex;gap:8px"><span>🔴</span><span style="color:var(--dim2)">WTI $95.5 · 通膨壓力升</span></div>
+        <div style="display:flex;gap:8px"><span>🟡</span><span style="color:var(--dim2)">VIX 15.94 · 接近警戒線</span></div>
+        <div style="display:flex;gap:8px"><span>🟡</span><span style="color:var(--dim2)">台幣 31.42 · 外資觀望</span></div>
+        <div style="display:flex;gap:8px"><span>🟢</span><span style="color:var(--dim2)">費半 +1.39% · 唯一多方亮點</span></div>
+      </div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--dim2)">
+        <div style="font-weight:700;color:var(--amber);margin-bottom:6px">⚠️ 偏空觀望 · 今晚 AVGO 是關鍵</div>
+        <div style="display:flex;gap:8px;margin-bottom:4px"><span style="color:var(--mint)">✅</span><span>AVGO 收斂 -5% 以內 → 45,500 試多</span></div>
+        <div style="display:flex;gap:8px"><span style="color:var(--red)">❌</span><span>AVGO 繼續擴大 → 45,000 看空</span></div>
+      </div>
+    </div>
+
+    <!-- 今日盤面重點 + 信號 -->
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px 16px">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--pink);font-weight:700;letter-spacing:.08em;margin-bottom:10px">🗞 今日盤面 · 選股信號</div>
+      <div style="display:grid;gap:8px;font-size:12px;color:var(--dim2)">
+        <div>
+          <span style="color:var(--red);font-weight:600">AI 族群潰敗</span>　緯創 -9%、英業達 -8%、仁寶跌停
+        </div>
+        <div>
+          <span style="color:var(--mint);font-weight:600">金融股逆勢</span>　凱基金 +8%、國泰金歷史新高
+        </div>
+        <div>
+          <span style="color:var(--text);font-weight:600">台積電股東會</span>　配息至少 24 元，收 2,385 元（-40）
+        </div>
+      </div>
+    </div>
+
+    <!-- 操盤邏輯 -->
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px 16px">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--pink);font-weight:700;letter-spacing:.08em;margin-bottom:10px">🎙 操盤邏輯</div>
+      <div style="display:grid;gap:9px;font-size:12px">
+        <div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--amber);font-weight:700;margin-bottom:3px">龍頭股 · 月線支撐多頭排列</div>
+          <div style="color:var(--dim2)">股價站上 MA20 且均線多頭排列 → 持有。凹到月線但未跌破 → 不減碼。跌破才考慮減碼。</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:3px">追蹤：2330 台積電 · NVDA</div>
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:8px">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--amber);font-weight:700;margin-bottom:3px">被動元件 CPO · 月線測試買點</div>
+          <div style="color:var(--dim2)">股價回測 MA20（距月線 -3% 以內）且未跌破 → 觀察加碼點。跌破月線才考慮減碼。</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:3px">追蹤：2492 華新科 · 2344 華邦電</div>
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:8px">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--amber);font-weight:700;margin-bottom:3px">總經指標 · 資金輪動時機</div>
+          <div style="color:var(--dim2)">VIX 回落 + 外資台指期淨多單回補 → 資金回流大型龍頭訊號。投信買超 2330 為近期最大催化劑。</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:3px">觀察名單：MRVL · AVGO（待 ASIC 方向明確）</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 本週行事曆 -->
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px 16px">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--pink);font-weight:700;letter-spacing:.08em;margin-bottom:10px">📅 本週行事曆</div>
+      <div style="display:grid;gap:8px;font-size:12px">
+        <div style="display:flex;gap:10px">
+          <span style="font-family:var(--mono);font-size:10px;color:var(--red);font-weight:700;min-width:60px;padding-top:1px">今晚 21:30</span>
+          <span style="color:var(--dim2)">美股開盤 + <b style="color:var(--text)">Warsh 首次講話</b>：鷹派壓科技，鴿派反彈</span>
+        </div>
+        <div style="display:flex;gap:10px">
+          <span style="font-family:var(--mono);font-size:10px;color:var(--red);font-weight:700;min-width:60px;padding-top:1px">週五 20:30</span>
+          <span style="color:var(--dim2)"><b style="color:var(--text)">NFP 非農就業</b>：強→不降息；弱→降息預期升</span>
+        </div>
+        <div style="display:flex;gap:10px">
+          <span style="font-family:var(--mono);font-size:10px;color:var(--amber);font-weight:700;min-width:60px;padding-top:1px">6/10</span>
+          <span style="color:var(--dim2)"><b style="color:var(--text)">Oracle 財報</b>：雲端積壓 $1,300 億</span>
+        </div>
+        <div style="display:flex;gap:10px">
+          <span style="font-family:var(--mono);font-size:10px;color:var(--amber);font-weight:700;min-width:60px;padding-top:1px">6/16-17</span>
+          <span style="color:var(--dim2)"><b style="color:var(--text)">FOMC 會議</b>：Warsh 首次主持，利率決策</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div><!-- end tab-summary -->
+
+<div id="tab-tw" class="tab-pane">
+<div class="sec-title">台股精選 <span style="font-family:var(--mono);font-size:9px;color:var(--dim);font-weight:400;letter-spacing:.05em">TTM P/E ≤ 30x · 依 P/E 低→高排列</span></div>
+<div class="tbl-wrap">
+  <table>
+    <thead><tr>
+      <th>股票</th>
+      <th onclick="sortBy('price')">現價 / 漲跌</th>
+      <th onclick="sortBy('pe')">P/E ↑</th>
+      <th>月線 MA20</th>
+      <th>季線 MA60</th>
+      <th>離季線</th>
+      <th>均線狀態</th>
+      <th>推薦原因</th>
+    </tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+</div><!-- end tab-tw -->
+
+<div id="tab-us" class="tab-pane">
+
+  <!-- 美股即時股價說明 -->
+  <div style="background:rgba(255,204,102,0.05);border:1px solid rgba(255,204,102,0.2);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-family:var(--mono);font-size:11px;color:var(--amber)">
+    ⚡ 點擊「↻ 更新報價」按鈕，即可同時更新台股 + 美股報價（盤前/盤中/盤後自動判斷）
+  </div>
+
+  <!-- 美股選股表格 -->
+  <div class="sec-title">美股精選 <span style="font-family:var(--mono);font-size:9px;color:var(--dim);font-weight:400">Forward P/E 低→高 · 排除高估值</span></div>
+  <div class="tbl-wrap">
+    <table id="us-tbl">
+      <thead><tr>
+        <th>股票</th>
+        <th onclick="usSortBy('price')">現價 / 盤前</th>
+        <th onclick="usSortBy('pe')">LTM P/E ↑</th>
+        <th>MA20</th>
+        <th>MA60</th>
+        <th>離MA20</th>
+        <th>均線狀態</th>
+        <th>選股依據</th>
+      </tr></thead>
+      <tbody id="us-tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="disc" style="margin-top:16px">⚠ 美股報價來源：Yahoo Finance（盤前/盤中/盤後延遲）。Forward P/E 來自法人共識預估，非即時數據。選股依據整合 GitHub 趨勢、Hacker News 熱議、法人評級，不構成投資建議。</div>
+</div><!-- end tab-us -->
+
+<div class="disc">⚠ 股價來源：Google Sheet + MIS 即時 API。目標價來自法人公開研報，不構成投資建議。投資有風險，自負盈虧。</div>
+</div>
+
+<script>
+/* ── Tabs ── */
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach(b=>{
+    b.classList.toggle('on', b.getAttribute('data-tab') === name);
+  });
+  document.querySelectorAll('.tab-pane').forEach(p=>{
+    p.classList.toggle('on', p.id === 'tab-'+name);
+  });
+  if(name === 'us') renderUSTable();
+  if(name === 'tw') render();
+}
+
+const SHEET_API = 'https://script.google.com/macros/s/AKfycbxDiYs1RfZpUYHrJxD8gKlCJITshage_N3dI6afBkH5wGForiN8lEeSW0LGPaAG-DBn/exec';
+
+(function tick(){
+  const n=new Date();
+  document.getElementById('clock').textContent=[n.getHours(),n.getMinutes(),n.getSeconds()].map(x=>String(x).padStart(2,'0')).join(':');
+  setTimeout(tick,1000);
+})();
+
+function setStatus(t,m){
+  document.getElementById('sdot').className='sdot '+({loading:'sd-loading',ok:'sd-ok',err:'sd-err'}[t]||'sd-idle');
+  document.getElementById('statusText').textContent=m;
+}
+
+/* ── 股票資料（按族群分組） ── */
+const GROUPS = [
+  {
+    id:'台股精選', name:'📊 台股精選 · TTM PE ≤ 30x · 月線多頭排列',
+    stocks:[
+      {t:'凱基金',c:'2883',sc:'s-fin',sec:'證券金控',pe:14.1,
+       ma20:23.5,ma60:21.0,price:27,
+       tpAvg:32,up:20,rtag:'r-hidden',
+       reason:'TTM PE 14.1x（股價 27 / 近4季 EPS 1.91）。📐 月線 MA20≈23.5 · 季線 MA60≈21.0 · 現價高於雙線多頭排列，離季線 +28.6%。今日 AI 股潰敗逆勢 +8%，台股成交量放大，券商手續費直接受惠。',
+       moat:'台股成交量愈大凱基金獲利愈高，AI 浪潮帶動成交放量，低基期防禦首選。'},
+      {t:'華新科',c:'2492',sc:'s-pas',sec:'MLCC',pe:23.9,
+       ma20:110,ma60:100,price:125,
+       tpAvg:380,up:30,rtag:'r-hidden',
+       reason:'TTM PE 23.9x（股價 125 / 近4季 EPS 5.22）。📐 月線 MA20≈110 · 季線 MA60≈100 · 現價高於雙線 +25%，均線多頭排列中。Vera Rubin 高階 MLCC 需求暴增，股價站月線之上，突破近60日高點條件成立。',
+       moat:'MLCC 台灣第二大廠，高階 AI MLCC 缺貨直接受惠，毛利率持續改善。'},
+      {t:'華邦電',c:'2344',sc:'s-mem',sec:'DRAM/NOR Flash',pe:29.0,
+       ma20:78,ma60:68,price:87.8,
+       tpAvg:222,up:40,rtag:'r-main',
+       reason:'TTM PE 29.0x（股價 87.8 / 近4季 EPS 3.03）。📐 月線 MA20≈78 · 季線 MA60≈68 · 現價高於雙線多頭排列，離季線 +29%。Q1 EPS 創近5年新高，4月獲利年增216倍，今日 AVGO 利空誤殺為買點。',
+       moat:'NOR Flash 全球前三，AI 機器人、IoT、車用三路並進，中國競爭對手難切入高階市場。'},
+    ]
+  },
+];
+const priceData = {};
+
+function peColor(pe){ return pe<20?'pe-g':pe<50?'pe-a':'pe-r'; }
+
+function priceHtml(code){
+  const pd=priceData[code];
+  if(!pd) return '<span class="p-spin">--</span>';
+  const cls=pd.chg>0?'p-up':pd.chg<0?'p-dn':'p-flat';
+  const sign=pd.chg>0?'+':'';
+  return `<div class="pe-val ${cls}" style="font-size:15px">${pd.price.toFixed(1)}</div>
+    <div style="font-family:var(--mono);font-size:11px" class="${cls}">${sign}${pd.chg.toFixed(2)} (${sign}${pd.chgPct.toFixed(2)}%)</div>`;
+}
+
+let curFilter='all', sortKey=null, sortDir=1;
+
+function render(){
+  const tbody=document.getElementById('tbody');
+  let html='';
+
+  GROUPS.forEach(grp=>{
+    // 篩選
+    if(curFilter!=='all' && grp.id!==curFilter) return;
+
+    // 族群 header 已移除
+
+    // 同族群內依 PE 排序（預設），或依 sortKey
+    let stocks=[...grp.stocks];
+    if(sortKey==='pe') stocks.sort((a,b)=>sortDir*(a.pe-b.pe));
+    else if(sortKey==='price'){
+      stocks.sort((a,b)=>{
+        const pa=priceData[a.c]?.price||0, pb=priceData[b.c]?.price||0;
+        return sortDir*(pb-pa);
+      });
+    } else {
+      stocks.sort((a,b)=>a.pe-b.pe); // 預設 PE 低→高
+    }
+
+    stocks.forEach(s=>{
+      const barW=Math.round(s.up/80*100); // 80% = 最大寬度基準
+      html+=`<tr>
+        <td>
+          <div class="ct">${s.t}</div>
+          <div class="cc">${s.c}</div>
+          <span class="cs ${s.sc}">${s.sec}</span>
+        </td>
+        <td>${priceHtml(s.c)}</td>
+        <td><span class="pe-val ${peColor(s.pe)}">${s.pe}x</span><div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:2px">${s.peType||'TTM'}</div></td>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--text);text-align:center">
+          ${s.ma20 ? s.ma20 : '<span style="color:var(--dim)">載入中</span>'}
+          ${(()=>{const p=priceData[s.c]?.price||s.price; return p&&s.ma20?'<div style="font-size:9px;color:'+(p>s.ma20?'var(--mint)':'var(--red)')+'">'+(p>s.ma20?'▲站上':'▼跌破')+'</div>':'';})()}
+        </td>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--text);text-align:center">
+          ${s.ma60 ? s.ma60 : '<span style="color:var(--dim)">載入中</span>'}
+          ${(()=>{const p=priceData[s.c]?.price||s.price; return p&&s.ma60?'<div style="font-size:9px;color:'+(p>s.ma60?'var(--mint)':'var(--red)')+'">'+(p>s.ma60?'▲站上':'▼跌破')+'</div>':'';})()}
+        </td>
+        <td style="font-family:var(--mono);font-size:12px;text-align:center">
+          ${(()=>{const p=priceData[s.c]?.price||s.price; return p&&s.ma60?'<span style="color:'+(p>s.ma60?'var(--mint)':'var(--red)')+'">'+((p-s.ma60)/s.ma60*100).toFixed(1)+'%</span>':'—';})()}
+        </td>
+        <td style="font-size:11px;text-align:center">
+          ${(()=>{const p=priceData[s.c]?.price||s.price; if(!p||!s.ma20||!s.ma60) return '—'; if(p>s.ma20&&s.ma20>s.ma60) return '<span style="color:var(--mint);font-weight:700">多頭排列</span>'; if(Math.abs(p-s.ma20)/s.ma20<0.05) return '<span style="color:var(--amber);font-weight:700">月線測試</span>'; if(p<s.ma20) return '<span style="color:var(--red)">跌破MA20</span>'; return '整理中';})()}
+        </td>
+        <td>
+          <span class="rtag ${s.rtag}">${s.reason}</span>
+        </td>
+      </tr>`;
+    });
+  });
+
+  tbody.innerHTML=html;
+
+  // 更新 priceData 顯示
+  document.querySelectorAll('thead th').forEach(th=>{
+    th.classList.remove('asc','desc');
+    const fn=th.getAttribute('onclick');
+    if(!fn) return;
+    const k=fn.match(/sortBy\('(\w+)'\)/)?.[1];
+    if(k===sortKey) th.classList.add(sortDir===1?'asc':'desc');
+  });
+}
+
+function setFilter(f,btn){
+  curFilter=f;
+  document.querySelectorAll('.fb').forEach(b=>b.classList.toggle('on',b===btn));
+  render();
+}
+
+function sortBy(key){
+  if(sortKey===key) sortDir*=-1; else{sortKey=key;sortDir=1;}
+  render();
+}
+
+/* ── 從 Google Sheet 載入 ── */
+async function loadPrices(){
+  const btn=document.getElementById('refreshBtn');
+  btn.disabled=true; btn.textContent='↻ 更新中...';
+  setStatus('loading','正在從 Google Sheet 取得股價...');
+
+  function fetchJSONP(url){
+    return new Promise((resolve,reject)=>{
+      const cb='gs_cb_'+Date.now();
+      const script=document.createElement('script');
+      const timer=setTimeout(()=>{cleanup();reject(new Error('逾時'));},20000);
+      function cleanup(){delete window[cb];if(script.parentNode)script.parentNode.removeChild(script);clearTimeout(timer);}
+      window[cb]=(data)=>{cleanup();resolve(data);};
+      script.onerror=()=>{cleanup();reject(new Error('Script 載入失敗'));};
+      script.src=url+(url.includes('?')?'&':'?')+'callback='+cb;
+      document.head.appendChild(script);
+    });
+  }
+
+  try{
+    let d;
+    try{ d=await fetchJSONP(SHEET_API); }
+    catch(e){ const r=await fetch(SHEET_API,{signal:AbortSignal.timeout(15000)}); d=await r.json(); }
+
+    const rows=d.prices||d.data||[];
+    let ok=0;
+    rows.forEach(row=>{
+      const code=String(row.code||'').trim();
+      if(!code) return;
+      const price=parseFloat(row.price)||0;
+      const prev=parseFloat(row.prev)||0;
+      const chg=prev?price-prev:0;
+      const chgPct=prev?chg/prev*100:0;
+      if(price>0){priceData[code]={price,prev,chg,chgPct};ok++;}
+    });
+
+    if(Array.isArray(d.signals)&&d.signals.length>0) renderSignals(d.signals);
+
+    const n=new Date();
+    document.getElementById('lastUpdate').textContent=
+      `更新：${n.toLocaleDateString('zh-TW',{month:'2-digit',day:'2-digit'})} ${n.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}`;
+    setStatus('ok',`${ok} 支股票報價更新完成 ✓`);
+    render();
+  }catch(e){
+    setStatus('err',`連線失敗：${e.message}`);
+  }
+  btn.disabled=false; btn.textContent='↻ 更新報價';
+}
+
+function renderSignals(signals){
+  const grid=document.getElementById('signal-grid');
+  if(!grid||!signals.length) return;
+  grid.innerHTML=signals.map(s=>{
+    const isJp=s.type==='jp', isWeak=s.type==='weak';
+    const cardCls=isWeak?'sc':isJp?'sc jp':'sc us';
+    const badgeCls=isWeak?'sc-badge bm':s.signal==='hot'?'sc-badge bh':'sc-badge bm';
+    const badgeText=isWeak?'▼ 弱勢':s.signal==='hot'?'▲▲ 強烈':'▲ 中等';
+    const flag=isJp?'🇯🇵':isWeak?'⚠️':'🇺🇸';
+    const pkCls=isJp?'pk jp':'pk us';
+    return `<div class="${cardCls}">
+      <div class="sc-h"><span class="sc-flag">${flag}</span><span class="sc-sec">${s.sector}</span><span class="${badgeCls}">${badgeText}</span></div>
+      <div class="sc-ev">${s.event}</div>
+      ${(s.picks||[]).length?`<div class="sc-picks">${s.picks.map(p=>`<span class="${pkCls}">${p}</span>`).join('')}</div>`:''}
+    </div>`;
+  }).join('');
+  if(signals[0]?.date) document.getElementById('signal-date').textContent=`📅 ${signals[0].date} 訊號`;
+}
+
+render();
+
+/* ── 美股資料 ── */
+// 美股族群分組（Forward PE ≤ 25x，依據 GitHub/HN/Google Trends 信號）
+// 選股邏輯：GitHub 近 30 天爆紅主題 × HN 熱議 × Google Trends 搜尋量 × Yahoo Finance 驗證 PE
+// 排除：Palantir 65x、CrowdStrike 50x、GEV 38x、Axon 55x — 估值太貴
+const US_GROUPS = [
+  {
+    id:'美股精選', name:'🇺🇸 美股精選 · LTM PE ≤ 30x',
+    stocks:[
+      {t:'Meta',c:'META',fpe:21.8,
+       ma20:613,ma60:618,price:622,
+       tpAvg:827,up:33,
+       trends:['tr-ai','tr-github'],tl:['LTM PE 21.8x','Llama 210k stars'],
+       reason:'LTM PE 21.8x。📐 MA20=613（站上 +1.5%），MA60=618（貼近月線測試中）。GitHub Llama 相關 repo 爆紅，Meta AI glasses 搜尋量 5 月創高，Ray-Ban AI 眼鏡月銷量創高。',
+       moat:'30 億 DAU 廣告護城河，Llama 開源帶動開發者生態，AI 眼鏡是下一硬體平台候選人。'},
+      {t:'Alphabet',c:'GOOGL',fpe:28.3,
+       ma20:391,ma60:349,price:342,
+       tpAvg:430,up:26,
+       trends:['tr-ai','tr-github'],tl:['LTM PE 28.3x','⚠️ 跌破MA20觀察'],
+       reason:'LTM PE 28.3x。📐 MA20=391（跌破 -12.5%），MA60=349（站上 -2.0%）。現價跌破 MA20，短線偏弱；但 MA60 尚未跌破，仍符合「凹到季線支撐」觀察邏輯。Q1 Cloud +34%，基本面無虞。',
+       moat:'搜尋市佔 90%+，TPU 自製晶片，YouTube 廣告+訂閱雙引擎，Cloud 加速成長。'},
+    ]
+  },
+];
+const US_STOCKS = US_GROUPS.flatMap(g => g.stocks.map(s=>({...s, group:g.id, groupName:g.name})));
+
+const usPriceData = {};
+let usSortKey = 'pe', usSortDir = 1;
+
+function usPeColor(pe){ return pe<15?'pe-g':pe<20?'pe-a':'pe-r'; }
+
+function usPriceHtml(code){
+  const pd = usPriceData[code];
+  if(!pd) return '<span class="p-spin">--</span>';
+  const cls = pd.chg>0?'p-up':pd.chg<0?'p-dn':'p-flat';
+  const sign = pd.chg>0?'+':'';
+  let h = `<div class="us-price ${cls}">$${pd.price.toFixed(2)}</div>
+    <div class="us-chg ${cls}">${sign}${pd.chg.toFixed(2)} (${sign}${pd.chgPct.toFixed(2)}%)</div>`;
+  if(pd.preMarket && Math.abs(pd.preMarket - pd.price) > 0.1)
+    h += `<div class="us-pre">盤前 $${pd.preMarket.toFixed(2)}</div>`;
+  return h;
+}
+
+function renderUSTable(){
+  const tbody = document.getElementById('us-tbody');
+  if(!tbody) return;
+  let html = '';
+
+  US_GROUPS.forEach(grp => {
+    // 族群 header
+    html += `<tr class="gh"><td colspan="8">${grp.name}</td></tr>`;
+
+    // 族群內按 PE 低→高
+    const stocks = [...grp.stocks].sort((a,b) => a.fpe - b.fpe);
+    stocks.forEach(s => {
+      const pc = usPeColor(s.fpe);
+      const tagsHtml = s.trends.map((t,i)=>`<span class="trend-tag ${t}">${s.tl[i]}</span>`).join(' ');
+      html += `<tr>
+        <td>
+          <div class="ct">${s.t}</div>
+          <div class="cc">${s.c}</div>
+          <div style="margin-top:4px">${tagsHtml}</div>
+        </td>
+        <td>${usPriceHtml(s.c)}</td>
+        <td>
+          <span class="pe-val ${pc}">${s.fpe}x</span>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--dim)">LTM P/E</div>
+        </td>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--text);text-align:center">
+          ${s.ma20 ? '$'+s.ma20 : '<span style="color:var(--dim);font-size:10px">載入中</span>'}
+          ${(()=>{const p=usPriceData[s.c]?.price||s.price; return p&&s.ma20?'<div style="font-size:9px;color:'+(p>s.ma20?'var(--mint)':'var(--red)')+'">'+(p>s.ma20?'▲站上':'▼跌破')+'</div>':'';})()}
+        </td>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--text);text-align:center">
+          ${s.ma60 ? '$'+s.ma60 : '<span style="color:var(--dim);font-size:10px">載入中</span>'}
+          ${(()=>{const p=usPriceData[s.c]?.price||s.price; return p&&s.ma60?'<div style="font-size:9px;color:'+(p>s.ma60?'var(--mint)':'var(--red)')+'">'+(p>s.ma60?'▲站上':'▼跌破')+'</div>':'';})()}
+        </td>
+        <td style="font-family:var(--mono);font-size:12px;text-align:center">
+          ${(()=>{const p=usPriceData[s.c]?.price||s.price; return p&&s.ma20?'<span style="color:'+(p>s.ma20?'var(--mint)':'var(--red)')+'">'+((p-s.ma20)/s.ma20*100).toFixed(1)+'%</span>':'—';})()}
+        </td>
+        <td style="font-size:11px;text-align:center">
+          ${(()=>{const p=usPriceData[s.c]?.price||s.price; if(!p||!s.ma20||!s.ma60) return '—'; if(p>s.ma20&&s.ma20>s.ma60) return '<span style="color:var(--mint);font-weight:700">多頭排列</span>'; if(Math.abs(p-s.ma20)/s.ma20<0.05) return '<span style="color:var(--amber);font-weight:700">月線測試</span>'; if(p<s.ma20) return '<span style="color:var(--red)">跌破MA20</span>'; return '整理中';})()}
+        </td>
+        <td style="font-size:11px;color:var(--dim2);max-width:180px;white-space:normal;line-height:1.5">${s.reason}</td>
+      </tr>`;
+    });
+  });
+
+  tbody.innerHTML = html;
+}
+
+function usSortBy(key){
+  if(usSortKey===key) usSortDir*=-1; else{usSortKey=key;usSortDir=1;}
+  renderUSTable();
+}
+
+async function fetchUSPrices(){
+  // 先顯示載入中
+  const tbody = document.getElementById('us-tbody');
+  if(tbody && !Object.keys(usPriceData).length){
+    tbody.querySelectorAll('td:nth-child(2)').forEach(td=>{
+      td.innerHTML='<span class="p-spin">載入中</span>';
+    });
+  }
+
+  const YF = 'https://query2.finance.yahoo.com/v8/finance/chart/';
+  let ok = 0;
+  await Promise.all(US_STOCKS.map(async s=>{
+    try{
+      // 用兩個 endpoint 輪流試
+      let d;
+      for(const base of ['https://query1.finance.yahoo.com','https://query2.finance.yahoo.com']){
+        try{
+          const r = await fetch(base+'/v8/finance/chart/'+s.c+'?interval=1m&range=1d',
+            {signal:AbortSignal.timeout(8000)});
+          d = await r.json();
+          if(d?.chart?.result?.[0]?.meta) break;
+        }catch(e2){}
+      }
+      const meta = d?.chart?.result?.[0]?.meta;
+      if(!meta) return;
+      const price = meta.regularMarketPrice || meta.previousClose || 0;
+      const prev  = meta.previousClose || meta.chartPreviousClose || 0;
+      const chg   = prev ? price-prev : 0;
+      const chgPct= prev ? chg/prev*100 : 0;
+      const preMarket = meta.preMarketPrice || null;
+      if(price > 0){
+        usPriceData[s.c] = {price, prev, chg, chgPct, preMarket};
+        ok++;
+      }
+    }catch(e){}
+  }));
+  renderUSTable();
+  console.log('美股報價更新：'+ok+'/'+US_STOCKS.length+' 支');
+}
+
+// ── Yahoo Finance 技術面 + PE 自動抓取 ──────────────────────────
+const YF_BASE = ['https://query1.finance.yahoo.com','https://query2.finance.yahoo.com'];
+const techData = {}; // { ticker: { pe, ma20, ma60, price } }
+
+async function yfFetch(ticker, params=''){
+  for(const base of YF_BASE){
+    try{
+      const r = await fetch(
+        `${base}/v8/finance/chart/${ticker}?interval=1d&range=90d${params}`,
+        {signal: AbortSignal.timeout(10000)}
+      );
+      const d = await r.json();
+      if(d?.chart?.result?.[0]) return d.chart.result[0];
+    }catch(e){}
+  }
+  return null;
+}
+
+async function fetchTechData(){
+  // 收集所有需要抓的 ticker
+  const twTickers = GROUPS.flatMap(g => g.stocks.map(s => s.c + '.TW'));
+  const usTickers = US_STOCKS.map(s => s.c);
+  const allTickers = [...twTickers, ...usTickers];
+
+  await Promise.all(allTickers.map(async ticker => {
+    const result = await yfFetch(ticker);
+    if(!result) return;
+
+    const meta   = result.meta;
+    const closes = result.indicators?.quote?.[0]?.close?.filter(v => v != null) ?? [];
+
+    const price = meta.regularMarketPrice || meta.previousClose || 0;
+    const pe    = meta.trailingPE || null;
+
+    // MA20 / MA60 — 用收盤價簡單移動平均
+    const ma20 = closes.length >= 20
+      ? Math.round(closes.slice(-20).reduce((a,b)=>a+b,0) / 20 * 100) / 100
+      : null;
+    const ma60 = closes.length >= 60
+      ? Math.round(closes.slice(-60).reduce((a,b)=>a+b,0) / 60 * 100) / 100
+      : (closes.length >= 20
+          ? Math.round(closes.reduce((a,b)=>a+b,0) / closes.length * 100) / 100
+          : null);
+
+    techData[ticker.replace('.TW','')] = { price, pe, ma20, ma60 };
+  }));
+
+  // 把 PE / MA 寫入 GROUPS（台股）
+  GROUPS.forEach(g => g.stocks.forEach(s => {
+    const td = techData[s.c];
+    if(!td) return;
+    if(td.pe)  s.pe   = Math.round(td.pe * 10) / 10;
+    if(td.ma20) s.ma20 = td.ma20;
+    if(td.ma60) s.ma60 = td.ma60;
+    if(td.price) s.price = td.price;
+  }));
+
+  // 把 PE / MA 寫入 US_GROUPS（美股）
+  US_STOCKS.forEach(s => {
+    const td = techData[s.c];
+    if(!td) return;
+    if(td.pe)  s.fpe  = Math.round(td.pe * 10) / 10;
+    if(td.ma20) s.ma20 = td.ma20;
+    if(td.ma60) s.ma60 = td.ma60;
+    if(td.price) s.price = td.price;
+  });
+
+  render();
+  renderUSTable();
+  console.log('技術面資料更新完成', techData);
+}
+
+document.addEventListener("DOMContentLoaded", function(){
+  render();
+  renderUSTable();
+  fetchUSPrices();
+  fetchTechData(); // 自動抓 PE + MA20 + MA60
+});
+</script>
+</body>
+</html>
